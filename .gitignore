@@ -29,3 +29,5 @@
 *.hex
 /build
 /.idea
+/objs/include/
+/research/librtmp/objs/
