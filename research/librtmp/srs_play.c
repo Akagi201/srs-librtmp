@@ -27,7 +27,7 @@ gcc srs_play.c ../../objs/lib/srs_librtmp.a -g -O0 -lstdc++ -o srs_play
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../../objs/include/srs_librtmp.h"
+#include "../../src/libs/srs_librtmp.hpp"
 
 int main(int argc, char **argv) {
     printf("suck rtmp stream like rtmpdump\n");

@@ -27,7 +27,7 @@ gcc srs_bandwidth_check.c ../../objs/lib/srs_librtmp.a -g -O0 -lstdc++ -o srs_ba
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../../objs/include/srs_librtmp.h"
+#include "../../src/libs/srs_librtmp.hpp"
 
 int main(int argc, char **argv) {
     int ret = 0;

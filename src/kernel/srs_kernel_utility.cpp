@@ -248,6 +248,8 @@ int __srs_create_dir_recursively(string dir)
         ret = ERROR_SUCCESS;
     }
     
+#ifndef _WIN32
+
     // create curren dir.
     mode_t mode = S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP|S_IROTH|S_IXOTH;
     if (::mkdir(dir.c_str(), mode) < 0) {
@@ -260,7 +262,16 @@ int __srs_create_dir_recursively(string dir)
         return ret;
     }
     srs_info("create dir %s success.", dir.c_str());
-    
+#endif
+
+#ifdef _WIN32
+    if (!CreateDirectory(dir.c_str(), NULL))
+    {
+        printf("CreateDirectory failed (%d)\n", GetLastError());
+        return ERROR_SYSTEM_DIR_EXISTS;
+    }
+    ret = ERROR_SUCCESS;
+#endif
     return ret;
 }
 

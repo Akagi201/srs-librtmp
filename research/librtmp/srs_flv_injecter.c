@@ -33,7 +33,7 @@ gcc srs_flv_injecter.c ../../objs/lib/srs_librtmp.a -g -O0 -lstdc++ -o srs_flv_i
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "../../objs/include/srs_librtmp.h"
+#include "../../src/libs/srs_librtmp.hpp"
 
 #define ERROR_INJECTED 10000
 

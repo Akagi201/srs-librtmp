@@ -33,7 +33,7 @@ gcc srs_audio_raw_publish.c ../../objs/lib/srs_librtmp.a -g -O0 -lstdc++ -o srs_
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "../../objs/include/srs_librtmp.h"
+#include "../../src/libs/srs_librtmp.hpp"
 
 // https://github.com/winlinvip/simple-rtmp-server/issues/212#issuecomment-63648892
 // allspace:

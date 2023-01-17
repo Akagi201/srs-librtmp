@@ -27,6 +27,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /*
 #include <srs_rtmp_utility.hpp>
 */
+#ifdef _WIN32
+#include <srs_librtmp.hpp>
+#endif
+
 #include <srs_core.hpp>
 
 #include <string>

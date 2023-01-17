@@ -28,7 +28,7 @@ gcc srs_ingest_rtmp.c ../../objs/lib/srs_librtmp.a -g -O0 -lstdc++ -o srs_ingest
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "../../objs/include/srs_librtmp.h"
+#include "../../src/libs/srs_librtmp.hpp"
 
 int connect_ic(srs_rtmp_t irtmp);
 

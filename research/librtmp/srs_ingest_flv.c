@@ -32,7 +32,7 @@ gcc srs_ingest_flv.c ../../objs/lib/srs_librtmp.a -g -O0 -lstdc++ -o srs_ingest_
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "../../objs/include/srs_librtmp.h"
+#include "../../src/libs/srs_librtmp.hpp"
 
 int proxy(srs_flv_t flv, srs_rtmp_t ortmp);
 

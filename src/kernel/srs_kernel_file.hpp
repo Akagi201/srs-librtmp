@@ -27,6 +27,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /*
 #include <srs_kernel_file.hpp>
 */
+
+#include <srs_librtmp.hpp>
 #include <srs_core.hpp>
 
 #include <string>

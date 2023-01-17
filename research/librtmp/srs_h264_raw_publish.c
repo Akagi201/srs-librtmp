@@ -33,7 +33,7 @@ gcc srs_h264_raw_publish.c ../../objs/lib/srs_librtmp.a -g -O0 -lstdc++ -o srs_h
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "../../objs/include/srs_librtmp.h"
+#include "../../src/libs/srs_librtmp.hpp"
 
 int read_h264_frame(char *data, int size, char **pp, int *pnb_start_code, int fps,
                     char **frame, int *frame_size, int *dts, int *pts) {

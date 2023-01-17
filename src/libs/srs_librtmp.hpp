@@ -43,18 +43,24 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 *************************************************************/
 // for srs-librtmp, @see https://github.com/winlinvip/simple-rtmp-server/issues/213
 #ifdef _WIN32
+    #if _MSC_VER < 1700 
+    #define snprintf _snprintf
+    #endif
     // include windows first.
     #include <windows.h>
+    #include <stdint.h>
+    #include <winerror.h>
     // the type used by this header for windows.
     typedef unsigned long long u_int64_t;
-    typedef long long int64_t;
     typedef unsigned int u_int32_t;
-    typedef int int32_t;
     typedef unsigned char u_int8_t;
-    typedef char int8_t;
     typedef unsigned short u_int16_t;
-    typedef short int16_t;
-    typedef int64_t ssize_t;
+    //typedef short int16_t;
+    //typedef int int32_t;
+    //typedef char int8_t;
+    //typedef long long int64_t;
+
+    typedef int64_t ssize_t ;
     struct iovec {
         void  *iov_base;    /* Starting address */
         size_t iov_len;     /* Number of bytes to transfer */
@@ -1038,7 +1044,7 @@ typedef void* srs_hijack_io_t;
     
     typedef int pid_t;
     pid_t getpid(void);
-    #define snprintf _snprintf
+//    #define snprintf _snprintf
     ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
     typedef int64_t useconds_t;
     int usleep(useconds_t usec);

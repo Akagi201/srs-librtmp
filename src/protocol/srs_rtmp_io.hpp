@@ -34,7 +34,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #ifndef _WIN32
 #include <sys/uio.h>
 #endif
-
+#ifdef _WIN32
+#include <srs_librtmp.hpp>
+#endif
 /**
 * the system io reader/writer architecture:
 +---------------+     +--------------------+      +---------------+

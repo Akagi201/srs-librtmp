@@ -21,7 +21,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#include <srs_librtmp.hpp>
+
 
 #include <stdlib.h>
 
@@ -29,6 +29,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #ifndef _WIN32
 #include <sys/time.h>
 #endif
+
+#ifdef _WIN32
+#include <srs_librtmp.hpp>
+#endif
+
 
 #include <string>
 #include <sstream>

@@ -28,7 +28,7 @@ gcc srs_publish.c ../../objs/lib/srs_librtmp.a -g -O0 -lstdc++ -o srs_publish
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "../../objs/include/srs_librtmp.h"
+#include "../../src/libs/srs_librtmp.hpp"
 
 int main(int argc, char **argv) {
     printf("publish rtmp stream to server like FMLE/FFMPEG/Encoder\n");

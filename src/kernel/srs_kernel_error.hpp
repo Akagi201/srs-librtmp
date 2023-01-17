@@ -35,6 +35,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define ERROR_SUCCESS                       0
 #endif
 
+#ifdef _WIN32
+#include <winerror.h>
+#endif
+
 ///////////////////////////////////////////////////////
 // system error.
 ///////////////////////////////////////////////////////

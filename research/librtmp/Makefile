@@ -47,8 +47,8 @@ clean:
 # srs library root
 SRS_OBJS = ../../objs
 # srs-librtmp for publish/play, built by srs.
-SRS_LIBRTMP_I = $(SRS_OBJS)/include/srs_librtmp.h
-SRS_LIBRTMP_L = $(SRS_OBJS)/lib/srs_librtmp.a
+SRS_LIBRTMP_I = ../../src/libs/srs_librtmp.hpp
+SRS_LIBRTMP_L = ../../build/libsrs_librtmp.a
 # openssl for complex handshake, built by srs.
 SRS_LIBSSL_L =
 # public depends, the Makefile or public headers.
@@ -68,7 +68,7 @@ ifeq ($(GCC), mipsel-openwrt-linux-gcc)
 endif
 # for ssl or nossl
 ifeq ($(HANDSHAKE), SSL)
-    SRS_LIBSSL_L = $(SRS_OBJS)/openssl/lib/libssl.a $(SRS_OBJS)/openssl/lib/libcrypto.a
+    SRS_LIBSSL_L = /usr/lib/x86_64-linux-gnu/libssl.a /usr/lib/x86_64-linux-gnu/libcrypto.a
 endif
 
 ssl:

@@ -28,6 +28,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <unistd.h>
 #endif
 
+#ifdef _WIN32
+#include <srs_librtmp.hpp>
+#endif
+
+
 #include <fcntl.h>
 #include <sstream>
 using namespace std;

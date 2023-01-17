@@ -30,7 +30,7 @@ gcc srs_rtmp_dump.c ../../objs/lib/srs_librtmp.a -g -O0 -lstdc++ -o srs_rtmp_dum
 #include <getopt.h>
 #include <assert.h>
 
-#include "../../objs/include/srs_librtmp.h"
+#include "../../src/libs/srs_librtmp.hpp"
 
 void parse_amf0_object(char *p, srs_amf0_t args) {
     char opvt = 0; // object property value type.
