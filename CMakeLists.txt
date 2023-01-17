@@ -12,3 +12,5 @@ INCLUDE_DIRECTORIES(src/core src/kernel src/libs src/protocol)
 add_library(srs_librtmp_static STATIC ${SOURCE_FILES})
 
 set_target_properties(srs_librtmp_static PROPERTIES OUTPUT_NAME "srs_librtmp")
+
+ADD_SUBDIRECTORY(research/librtmp)
