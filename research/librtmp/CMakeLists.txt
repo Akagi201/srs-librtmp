@@ -1,18 +1,15 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.10)
 
 PROJECT(
-    BIRDDOG_RTMP_PUB_APP
+    BirdDog_Ndi_Over_Rtmp_Url_PublishApp
     VERSION 1.0.0
-    DESCRIPTION "BirdDog RTMP publishing application (NDI over RTMP)."
+    DESCRIPTION "BirdDog Ndi over RTMP url publishing application (NDI over RTMP)."
     LANGUAGES C CXX
 )
 
-SET(SRS_LIBRTMP_L ../../winbuild/Debug/srs_librtmp.lib )
-
-
 SET(LIBS_3RD_PARTY ${CMAKE_SOURCE_DIR}/3rdParty)
 
-SET(LIBS_3RD_PARTY_NDI_PATH         ${LIBS_3RD_PARTY}/ndi)
+SET(LIBS_3RD_PARTY_NDI_PATH         ${LIBS_3RD_PARTY}/ndi/libs)
 SET(LIBS_3RD_PARTY_NDI_WIN_LIB      ${LIBS_3RD_PARTY_NDI_PATH}/Processing.NDI.Lib.Advanced.x64.lib)
 SET(LIBS_3RD_PARTY_NDI_LINUX        ${LIBS_3RD_PARTY_NDI_PATH}/libndi-x86_64.so.5)
 SET(LIBS_3RD_PARTY_NDI_ARM32        ${LIBS_3RD_PARTY_NDI_PATH}/libndi-armv7l.so.5)
@@ -31,28 +28,28 @@ else()
     endif()
 endif()
 
-INCLUDE_DIRECTORIES( ../../src/libs/srs_librtmp.hpp ${CMAKE_SOURCE_DIR}/ndi)
-INCLUDE_DIRECTORIES(${INCLUDE_3RD_PARTY_NDI})
+SET( SRS_LIB_INCLUDE_DIRS 
+	${CMAKE_SOURCE_DIR}/src/core 
+	${CMAKE_SOURCE_DIR}/src/kernel
+	${CMAKE_SOURCE_DIR}/src/libs
+	${CMAKE_SOURCE_DIR}/src/protocol )
+	
+INCLUDE_DIRECTORIES( SRS_LIB_INCLUDE_DIRS 
+	${INCLUDE_3RD_PARTY_NDI})
 
-SET(SRC_FILE_LISTS  ${CMAKE_SOURCE_DIR}/research/librtmp/bd_srs_h264_publish.cpp )
+SET(SRC_FILE_LISTS  ${CMAKE_SOURCE_DIR}/application/src/main.cpp )
 SET(CMAKE_C_COMPILER gcc  )
 SET(CMAKE_CXX_COMPILER g++ )
 SET(CMAKE_CXX_STANDARD 11)
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
 add_executable(BDRtmpPublishApp ${SRC_FILE_LISTS} )
-if(NOT MSVC)
-    target_link_libraries(BDRtmpPublishApp dl)
-endif()
 
 #supplied libraries
 add_library(libndi STATIC IMPORTED)
 set_property(TARGET libndi PROPERTY IMPORTED_LOCATION ${LIB_NDI_SHARED})
 
-add_library(librtmpstatic STATIC IMPORTED)
-set_property(TARGET librtmpstatic PROPERTY IMPORTED_LOCATION ${SRS_LIBRTMP_L})
-
-target_link_libraries(BDRtmpPublishApp  librtmpstatic)
+target_link_libraries(BDRtmpPublishApp  libndi srs_librtmp_static)
 
 # cmake -DCMAKE_BUILD_TYPE=debug ..
 # cmake --build .

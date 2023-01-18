@@ -1,27 +1,6 @@
 /*
-The MIT License (MIT)
-
-Copyright (c) 2013-2015 winlin
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-/**
-gcc srs_h264_raw_publish.c ../../objs/lib/srs_librtmp.a -g -O0 -lstdc++ -o srs_h264_raw_publish
+Author - Anshul Yadav
+CopyRight - BirdDog
 */
 
 #include <stdio.h>
@@ -34,83 +13,83 @@ gcc srs_h264_raw_publish.c ../../objs/lib/srs_librtmp.a -g -O0 -lstdc++ -o srs_h
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <cstring>
 
-#include "../../src/libs/srs_librtmp.hpp"
+#include "srs_librtmp.hpp"
 
 #include <Processing.NDI.Advanced.h>
 
-//const char* cameraName = "PTZOpticsCamera (Channel 1)";
-const char* cameraName = "P100-OHLEH (CAM_HX)";
 
 
 int main(int argc, char **argv) {
-    printf("publish raw h.264 as rtmp stream to server like FMLE/FFMPEG/Encoder\n");
-    printf("SRS(simple-rtmp-server) client librtmp library.\n");
-    printf("version: %d.%d.%d\n", srs_version_major(), srs_version_minor(), srs_version_revision());
+    printf("publish ndi camera as rtmp stream to server like Nginx/FMLE/FFMPEG/Encoder\n");
+    printf("BirdDog Ndi over Rtmp url publishing application .\n");
 
     if (argc <= 2) {
-        printf("Usage: %s <h264_raw_file> <rtmp_publish_url>\n", argv[0]);
-        printf("     h264_raw_file: the h264 raw steam file.\n");
-        printf("     rtmp_publish_url: the rtmp publish url.\n");
+        printf("Usage: %s \"<ndi camera>\" rtmp://nginxServerIP:1935/bdlive/stream\n", argv[0]);
+        printf("     ndi camera: H264 streaming NDI camera.e.g. \"P100-OHLEH (CAM_HX)\"\n");
+        printf("     rtmp_publish_url: the rtmp publish url to server, vlc connect to this server.\n");
         printf("For example:\n");
-        printf("     %s ./720p.h264.raw rtmp://127.0.0.1:1935/live/livestream\n", argv[0]);
-        printf("Where the file: http://winlinvip.github.io/srs.release/3rdparty/720p.h264.raw\n");
-        printf("See: https://github.com/winlinvip/simple-rtmp-server/issues/66\n");
+        printf("     %s rtmp://192.168.208.52:1935/bdlive/pubapp\n", argv[0]);
         exit(-1);
     }
 
-    if (!NDIlib_initialize())
-        return 0;
-
-    NDIlib_recv_create_v3_t mRecvType_H264;
-
-    mRecvType_H264.p_ndi_recv_name = "RTMP-PUB-H264";
-    mRecvType_H264.color_format = (NDIlib_recv_color_format_e)NDIlib_recv_color_format_ex_compressed_v5_with_audio;//NDIlib_recv_color_format_ex_compressed_v3_with_audio;
-    mRecvType_H264.bandwidth = NDIlib_recv_bandwidth_highest;
-
-    NDIlib_source_t src;
-    src.p_ndi_name = cameraName;
-    src.p_ip_address = "192.168.208.51";
-    mRecvType_H264.source_to_connect_to = src;
-
-    NDIlib_recv_instance_t pNDI_recv = NDIlib_recv_create_v4(&mRecvType_H264, 0);
-    if (!pNDI_recv)
-        return 0;
-
-    NDIlib_recv_connect(pNDI_recv, &src);
-
-    const char *raw_file = argv[1];
+ //const char* cameraName = "PTZOpticsCamera (Channel 1)";
+    char *cameraName = argv[1];
     const char *rtmp_url = argv[2];
-    srs_human_trace("raw_file=%s, rtmp_url=%s", raw_file, rtmp_url);
+    srs_human_trace("camera name =%s, rtmp_url=%s", cameraName, rtmp_url);
 
     // connect rtmp context
     srs_rtmp_t rtmp = srs_rtmp_create(rtmp_url);
 
     if (srs_rtmp_handshake(rtmp) != 0) {
-        srs_human_trace("simple handshake failed.");
-        goto rtmp_destroy;
+        srs_human_trace("Rtmp handshake failed.");
+        srs_rtmp_destroy(rtmp);
+        return -1;
     }
-    srs_human_trace("simple handshake success");
+    srs_human_trace("Rtmp handshake success");
 
     if (srs_rtmp_connect_app(rtmp) != 0) {
         srs_human_trace("connect vhost/app failed.");
-        goto rtmp_destroy;
+        srs_rtmp_destroy(rtmp);
+        return -1;
     }
     srs_human_trace("connect vhost/app success");
 
     if (srs_rtmp_publish_stream(rtmp) != 0) {
         srs_human_trace("publish stream failed.");
-        goto rtmp_destroy;
+        srs_rtmp_destroy(rtmp);
+        return -1;
     }
     srs_human_trace("publish stream success");
 
-    u_int32_t dts = 0;
-    u_int32_t pts = 0;
+   if (!NDIlib_initialize())
+        return -1;
+
+    NDIlib_recv_create_v3_t mRecvType_H264;
+
+    mRecvType_H264.p_ndi_recv_name = "RTMP-PUB-H264";
+    mRecvType_H264.color_format = (NDIlib_recv_color_format_e)NDIlib_recv_color_format_ex_compressed_v5_with_audio;
+    mRecvType_H264.bandwidth = NDIlib_recv_bandwidth_highest;
+
+    NDIlib_source_t src;
+    src.p_ndi_name = argv[1];
+    //src.p_ip_address = "192.168.208.51";
+    mRecvType_H264.source_to_connect_to = src;
+
+    NDIlib_recv_instance_t pNDI_recv = NDIlib_recv_create_v4(&mRecvType_H264, 0);
+    if (!pNDI_recv)
+        return -1;
+
+    NDIlib_recv_connect(pNDI_recv, &src);
+
+    uint32_t dts = 0;
+    uint32_t pts = 0;
     // @remark, the dts and pts if read from device, for instance, the encode lib,
     // so we assume the fps is 25, and each h264 frame is 1000ms/25fps=40ms/f.
     float fps = 25.0;
-    u_int32_t prevPts = 0;
-    static u_int32_t mFrameCounter = 0;
+    uint32_t prevPts = 0;
+    static uint32_t mFrameCounter = 0;
     for (;;)
     {
 
@@ -158,7 +137,11 @@ int main(int argc, char **argv) {
                 }
                 else {
                     srs_human_trace("send h264 raw data failed. ret=%d", ret);
-                    goto rtmp_destroy;
+                    srs_rtmp_destroy(rtmp);
+                   	// Destroy the receiver
+                    NDIlib_recv_destroy(pNDI_recv);
+                    NDIlib_destroy();
+                    return -1;
                 }
             }
 
@@ -180,10 +163,11 @@ int main(int argc, char **argv) {
         }
     }
 
-    srs_human_trace("h264 raw data completed");
-
-    rtmp_destroy:
+    srs_human_trace("streaming sending exited.");
     srs_rtmp_destroy(rtmp);
+    // Destroy the receiver
+    NDIlib_recv_destroy(pNDI_recv);
+    NDIlib_destroy();
     return 0;
 }
 
