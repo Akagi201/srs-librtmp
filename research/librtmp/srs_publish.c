@@ -1,34 +1,24 @@
-/*
-The MIT License (MIT)
 
-Copyright (c) 2013-2015 winlin
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
 /**
 gcc srs_publish.c ../../objs/lib/srs_librtmp.a -g -O0 -lstdc++ -o srs_publish
 */
 
+
 #include <stdio.h>
 #include <stdlib.h>
+#ifndef _WIN32
 #include <unistd.h>
-
+#endif
 #include "../../src/libs/srs_librtmp.hpp"
+
+
+#include <Processing.NDI.Advanced.h>
+
+#define BDPrint(msg) printf("\n BDRtmpPub : %s ",msg );
+
+
+const char* cameraName = "PTZOpticsCamera (Channel 1)";
+//const char* cameraName = "ANSHUL-PC (P100-OHLEH (CAM_HX))";
 
 int main(int argc, char **argv) {
     printf("publish rtmp stream to server like FMLE/FFMPEG/Encoder\n");
@@ -43,6 +33,25 @@ int main(int argc, char **argv) {
                argv[0], argv[0]);
         exit(-1);
     }
+    if (!NDIlib_initialize())
+        return 0;
+
+    NDIlib_recv_create_v3_t mRecvType_H264;
+
+    mRecvType_H264.p_ndi_recv_name = "RTMP-PUB-H264";
+    mRecvType_H264.color_format = (NDIlib_recv_color_format_e)NDIlib_recv_color_format_ex_compressed_v5_with_audio;//NDIlib_recv_color_format_ex_compressed_v3_with_audio;
+    mRecvType_H264.bandwidth = NDIlib_recv_bandwidth_highest;
+
+    NDIlib_source_t src;
+    src.p_ndi_name = cameraName;
+    src.p_ip_address = "192.168.208.51";
+    mRecvType_H264.source_to_connect_to = src;
+
+    NDIlib_recv_instance_t pNDI_recv = NDIlib_recv_create_v4(&mRecvType_H264, 0);
+    if (!pNDI_recv)
+        return 0;
+
+    NDIlib_recv_connect(pNDI_recv, &src);
 
     // warn it .
     // @see: https://github.com/winlinvip/simple-rtmp-server/issues/126
@@ -73,23 +82,102 @@ int main(int argc, char **argv) {
     srs_human_trace("publish stream success");
 
     u_int32_t timestamp = 0;
-    for (; ;) {
-        char type = SRS_RTMP_TYPE_VIDEO;
-        int size = 4096;
-        char *data = (char *) malloc(4096);
+    u_int32_t mPts = 0, mDts = 0, mPreviousPts = 0;
+    static u_int32_t mFrameCounter = 0;
+    for (;;)
+    {
 
-        timestamp += 40;
+        NDIlib_video_frame_v2_t video_frame;
+        NDIlib_audio_frame_v3_t audio_frame;
+        NDIlib_metadata_frame_t metadata_frame;
 
-        if (srs_rtmp_write_packet(rtmp, type, timestamp, data, size) != 0) {
-            goto rtmp_destroy;
+        auto retType = NDIlib_recv_capture_v3(pNDI_recv, &video_frame, NULL, NULL, 1000);
+        switch (retType)
+        {
+        
+        case NDIlib_frame_type_video:
+        {
+            NDIlib_compressed_packet_t VideoFrameCompressedPacket;
+            memcpy(&VideoFrameCompressedPacket, video_frame.p_data, sizeof(NDIlib_compressed_packet_t));
+            int DataSize = VideoFrameCompressedPacket.data_size + VideoFrameCompressedPacket.extra_data_size;
+            if (NDIlib_compressed_FourCC_type_HEVC == VideoFrameCompressedPacket.fourCC)
+            {
+                g_b_SourceTypeIsHEVC = true;
+            }
+            else if (NDIlib_compressed_FourCC_type_H264 == VideoFrameCompressedPacket.fourCC)
+            {
+                g_b_SourceTypeIsHEVC = false;
+            }
+            else
+                continue;
+            uint8_t* dataPtr = video_frame.p_data + VideoFrameCompressedPacket.version;
+            uint8_t* inBuffer = new uint8_t[DataSize];
+            memcpy(inBuffer, dataPtr, DataSize);
+            int size = DataSize;
+            char* data = (char*)malloc(DataSize);
+
+            memcpy(data, dataPtr, DataSize);
+            char type = SRS_RTMP_TYPE_VIDEO;
+            int err = 0;
+            mPts = (1000 * (video_frame.frame_rate_D / video_frame.frame_rate_N)) * 90 * (++mFrameCounter);
+            mDts = mPreviousPts;
+            mPreviousPts = mPts;
+            //if((err = srs_rtmp_write_packet(rtmp, type, timestamp, data, size)) != 0) {
+            if ((err = srs_h264_write_raw_frames(rtmp, data, size, mDts, mPts)) != 0) {
+                BDPrint(err);
+                goto rtmp_destroy;
+            }
+            NDIlib_recv_free_video_v2(pNDI_recv, &video_frame);
+            break
         }
-        srs_human_trace("sent packet: type=%s, time=%d, size=%d",
-                        srs_human_flv_tag_type2string(type), timestamp, size);
+        case NDIlib_frame_type_audio:
+        {
+            NDIlib_compressed_packet_t compressed_frame;
+            size_t fs = sizeof(NDIlib_compressed_packet_t);
+            memcpy(&compressed_frame, audio_frame.p_data, fs);
+            if ((NDIlib_FourCC_audio_type_ex_e)compressed_frame.fourCC == NDIlib_FourCC_audio_type_ex_AAC)
+            {
+                //(ProcDataFn)(audio_frame.p_data + fs, compressed_frame.data_size, audio_frame.sample_rate, audio_frame.no_samples, audio_frame.no_channels, false);
+            }
+            else if ((NDIlib_FourCC_audio_type_ex_e)compressed_frame.fourCC == NDIlib_FourCC_audio_type_ex_OPUS)
+            {
+                BDPrint("OPUS audio frames not supported, only AAC.");
+            }
+            else
+            {
+                //BDPrint("Uncompressed audio data is not supported.");
+            }
 
-        usleep(40 * 1000);
+            NDIlib_recv_free_audio_v3(pNDI_recv, &audio_frame);
+        }
+        break;
+
+        // Meta data
+        case NDIlib_frame_type_metadata:
+            BDPrint("Meta data received.");
+            NDIlib_recv_free_metadata(pNDI_recv, &metadata_frame);
+            break;
+
+        case NDIlib_frame_type_error:
+            BDPrint("NDIlib_frame_type_error");
+            break;
+        case NDIlib_frame_type_status_change:
+            BDPrint("NDIlib_frame_type_status_change");
+            break;
+        case NDIlib_frame_type_none:
+            BDPrint("NDIlib_frame_type_none");
+            break;
+        default:
+            break;
+
+        }
     }
 
-    rtmp_destroy:
+rtmp_destroy:
+
+    // Destroy the receiver
+    NDIlib_recv_destroy(pNDI_recv);
+    NDIlib_destroy();
     srs_rtmp_destroy(rtmp);
 
     return 0;

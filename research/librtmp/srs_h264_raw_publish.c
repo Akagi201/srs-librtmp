@@ -26,8 +26,10 @@ gcc srs_h264_raw_publish.c ../../objs/lib/srs_librtmp.a -g -O0 -lstdc++ -o srs_h
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 // for open h264 raw file.
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -35,45 +37,11 @@ gcc srs_h264_raw_publish.c ../../objs/lib/srs_librtmp.a -g -O0 -lstdc++ -o srs_h
 
 #include "../../src/libs/srs_librtmp.hpp"
 
-int read_h264_frame(char *data, int size, char **pp, int *pnb_start_code, int fps,
-                    char **frame, int *frame_size, int *dts, int *pts) {
-    char *p = *pp;
+#include <Processing.NDI.Advanced.h>
 
-    // @remark, for this demo, to publish h264 raw file to SRS,
-    // we search the h264 frame from the buffer which cached the h264 data.
-    // please get h264 raw data from device, it always a encoded frame.
-    if (!srs_h264_startswith_annexb(p, size - (p - data), pnb_start_code)) {
-        srs_human_trace("h264 raw data invalid.");
-        return -1;
-    }
+//const char* cameraName = "PTZOpticsCamera (Channel 1)";
+const char* cameraName = "P100-OHLEH (CAM_HX)";
 
-    // @see srs_write_h264_raw_frames
-    // each frame prefixed h.264 annexb header, by N[00] 00 00 01, where N>=0, 
-    // for instance, frame = header(00 00 00 01) + payload(67 42 80 29 95 A0 14 01 6E 40)
-    *frame = p;
-    p += *pnb_start_code;
-
-    for (; p < data + size; p++) {
-        if (srs_h264_startswith_annexb(p, size - (p - data), NULL)) {
-            break;
-        }
-    }
-
-    *pp = p;
-    *frame_size = p - *frame;
-    if (*frame_size <= 0) {
-        srs_human_trace("h264 raw data invalid.");
-        return -1;
-    }
-
-    // @remark, please get the dts and pts from device,
-    // we assume there is no B frame, and the fps can guess the fps and dts,
-    // while the dts and pts must read from encode lib or device.
-    *dts += 1000 / fps;
-    *pts = *dts;
-
-    return 0;
-}
 
 int main(int argc, char **argv) {
     printf("publish raw h.264 as rtmp stream to server like FMLE/FFMPEG/Encoder\n");
@@ -91,37 +59,29 @@ int main(int argc, char **argv) {
         exit(-1);
     }
 
+    if (!NDIlib_initialize())
+        return 0;
+
+    NDIlib_recv_create_v3_t mRecvType_H264;
+
+    mRecvType_H264.p_ndi_recv_name = "RTMP-PUB-H264";
+    mRecvType_H264.color_format = (NDIlib_recv_color_format_e)NDIlib_recv_color_format_ex_compressed_v5_with_audio;//NDIlib_recv_color_format_ex_compressed_v3_with_audio;
+    mRecvType_H264.bandwidth = NDIlib_recv_bandwidth_highest;
+
+    NDIlib_source_t src;
+    src.p_ndi_name = cameraName;
+    src.p_ip_address = "192.168.208.51";
+    mRecvType_H264.source_to_connect_to = src;
+
+    NDIlib_recv_instance_t pNDI_recv = NDIlib_recv_create_v4(&mRecvType_H264, 0);
+    if (!pNDI_recv)
+        return 0;
+
+    NDIlib_recv_connect(pNDI_recv, &src);
+
     const char *raw_file = argv[1];
     const char *rtmp_url = argv[2];
     srs_human_trace("raw_file=%s, rtmp_url=%s", raw_file, rtmp_url);
-
-    // open file
-    int raw_fd = open(raw_file, O_RDONLY);
-    if (raw_fd < 0) {
-        srs_human_trace("open h264 raw file %s failed.", raw_file);
-        goto rtmp_destroy;
-    }
-
-    off_t file_size = lseek(raw_fd, 0, SEEK_END);
-    if (file_size <= 0) {
-        srs_human_trace("h264 raw file %s empty.", raw_file);
-        goto rtmp_destroy;
-    }
-    srs_human_trace("read entirely h264 raw file, size=%dKB", (int) (file_size / 1024));
-
-    char *h264_raw = (char *) malloc(file_size);
-    if (!h264_raw) {
-        srs_human_trace("alloc raw buffer failed for file %s.", raw_file);
-        goto rtmp_destroy;
-    }
-
-    lseek(raw_fd, 0, SEEK_SET);
-    ssize_t nb_read = 0;
-    if ((nb_read = read(raw_fd, h264_raw, file_size)) != file_size) {
-        srs_human_trace("buffer %s failed, expect=%dKB, actual=%dKB.",
-                        raw_file, (int) (file_size / 1024), (int) (nb_read / 1024));
-        goto rtmp_destroy;
-    }
 
     // connect rtmp context
     srs_rtmp_t rtmp = srs_rtmp_create(rtmp_url);
@@ -148,54 +108,82 @@ int main(int argc, char **argv) {
     u_int32_t pts = 0;
     // @remark, the dts and pts if read from device, for instance, the encode lib,
     // so we assume the fps is 25, and each h264 frame is 1000ms/25fps=40ms/f.
-    u_int32_t fps = 25;
-    // @remark, to decode the file.
-    char *p = h264_raw;
-    for (; p < h264_raw + file_size;) {
-        // @remark, read a frame from file buffer.
-        char *data = NULL;
-        int size = 0;
-        int nb_start_code = 0;
-        if (read_h264_frame(h264_raw, file_size, &p, &nb_start_code, fps,
-                            &data, &size, &dts, &pts) < 0
-                ) {
-            srs_human_trace("read a frame from file buffer failed.");
-            goto rtmp_destroy;
-        }
+    float fps = 25.0;
+    u_int32_t prevPts = 0;
+    static u_int32_t mFrameCounter = 0;
+    for (;;)
+    {
 
-        // send out the h264 packet over RTMP
-        int ret = srs_h264_write_raw_frames(rtmp, data, size, dts, pts);
-        if (ret != 0) {
-            if (srs_h264_is_dvbsp_error(ret)) {
-                srs_human_trace("ignore drop video error, code=%d", ret);
-            } else if (srs_h264_is_duplicated_sps_error(ret)) {
-                srs_human_trace("ignore duplicated sps, code=%d", ret);
-            } else if (srs_h264_is_duplicated_pps_error(ret)) {
-                srs_human_trace("ignore duplicated pps, code=%d", ret);
-            } else {
-                srs_human_trace("send h264 raw data failed. ret=%d", ret);
-                goto rtmp_destroy;
+        NDIlib_video_frame_v2_t video_frame;
+        auto retType = NDIlib_recv_capture_v3(pNDI_recv, &video_frame, NULL, NULL, 1000);
+        switch (retType)
+        {
+        case NDIlib_frame_type_video:
+        {
+            NDIlib_compressed_packet_t VideoFrameCompressedPacket;
+            memcpy(&VideoFrameCompressedPacket, video_frame.p_data, sizeof(NDIlib_compressed_packet_t));
+            int DataSize = VideoFrameCompressedPacket.data_size + VideoFrameCompressedPacket.extra_data_size;
+            if (NDIlib_compressed_FourCC_type_HEVC == VideoFrameCompressedPacket.fourCC)
+            {
+                //g_b_SourceTypeIsHEVC = true;
             }
+            else if (NDIlib_compressed_FourCC_type_H264 == VideoFrameCompressedPacket.fourCC)
+            {
+                //g_b_SourceTypeIsHEVC = false;
+            }
+            else
+                continue;
+            uint8_t* dataPtr = video_frame.p_data + VideoFrameCompressedPacket.version;
+            int size = DataSize;
+            char* data = (char*)malloc(DataSize);
+
+            memcpy(data, dataPtr, DataSize);
+            char type = SRS_RTMP_TYPE_VIDEO;
+            fps = (float)((float)video_frame.frame_rate_N / (float)video_frame.frame_rate_D);
+            pts += (video_frame.frame_rate_D*1000) / video_frame.frame_rate_N;
+            dts = prevPts;
+            prevPts = pts;
+            
+            // send out the h264 packet over RTMP
+            int ret = srs_h264_write_raw_frames(rtmp, data, size, pts, pts);
+            if (ret != 0) {
+                if (srs_h264_is_dvbsp_error(ret)) {
+                    srs_human_trace("ignore drop video error, code=%d", ret);
+                }
+                else if (srs_h264_is_duplicated_sps_error(ret)) {
+                    srs_human_trace("ignore duplicated sps, code=%d", ret);
+                }
+                else if (srs_h264_is_duplicated_pps_error(ret)) {
+                    srs_human_trace("ignore duplicated pps, code=%d", ret);
+                }
+                else {
+                    srs_human_trace("send h264 raw data failed. ret=%d", ret);
+                    goto rtmp_destroy;
+                }
+            }
+
+            // 5bits, 7.3.1 NAL unit syntax, 
+            // H.264-AVC-ISO_IEC_14496-10.pdf, page 44.
+            u_int8_t nut = (char)data[0] & 0x1f;
+            srs_human_trace("sent packet: type=%s, time=%d, size=%d, fps=%f, b[%d]=%#x(%s)",
+                srs_human_flv_tag_type2string(SRS_RTMP_TYPE_VIDEO), dts, size, fps, 0,
+                (char)data[0],
+                (nut == 7 ? "SPS" : (nut == 8 ? "PPS" : (nut == 5 ? "I" : (nut == 1 ? "P" : "Unknown")))));
+
+            NDIlib_recv_free_video_v2(pNDI_recv, &video_frame);
+            break;
         }
 
-        // 5bits, 7.3.1 NAL unit syntax, 
-        // H.264-AVC-ISO_IEC_14496-10.pdf, page 44.
-        u_int8_t nut = (char) data[nb_start_code] & 0x1f;
-        srs_human_trace("sent packet: type=%s, time=%d, size=%d, fps=%d, b[%d]=%#x(%s)",
-                        srs_human_flv_tag_type2string(SRS_RTMP_TYPE_VIDEO), dts, size, fps, nb_start_code,
-                        (char) data[nb_start_code],
-                        (nut == 7 ? "SPS" : (nut == 8 ? "PPS" : (nut == 5 ? "I" : (nut == 1 ? "P" : "Unknown")))));
-
-        // @remark, when use encode device, it not need to sleep.
-        usleep(1000 / fps * 1000);
+        default:
+        {
+        }
+        }
     }
+
     srs_human_trace("h264 raw data completed");
 
     rtmp_destroy:
     srs_rtmp_destroy(rtmp);
-    close(raw_fd);
-    free(h264_raw);
-
     return 0;
 }
 
