@@ -1,16 +1,14 @@
-cmake_minimum_required(VERSION 2.8.4)
+# CMakeLists.txt in live
 
-project(srs_librtmp)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.10)
 
-AUX_SOURCE_DIRECTORY(src/core SOURCE_FILES)
-AUX_SOURCE_DIRECTORY(src/kernel SOURCE_FILES)
-AUX_SOURCE_DIRECTORY(src/libs SOURCE_FILES)
-AUX_SOURCE_DIRECTORY(src/protocol SOURCE_FILES)
+PROJECT(
+    BIRDDOG_NDI_OVER_RTMP_PUBAPP
+    VERSION 1.0.0
+    DESCRIPTION "BirdDog RTMP support(NDI over RTMP)."
+    LANGUAGES C CXX
+)
 
-INCLUDE_DIRECTORIES(src/core src/kernel src/libs src/protocol)
+ADD_SUBDIRECTORY(rtmplibrary/src)
 
-add_library(srs_librtmp_static STATIC ${SOURCE_FILES})
-
-set_target_properties(srs_librtmp_static PROPERTIES OUTPUT_NAME "srs_librtmp")
-
-ADD_SUBDIRECTORY(research/librtmp)
+ADD_SUBDIRECTORY(BirdDogApp)

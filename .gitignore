@@ -31,3 +31,6 @@
 /.idea
 /objs/include/
 /research/librtmp/objs/
+winbuild/.vs/srs_librtmp/v16/.suo
+winbuild/.vs/srs_librtmp/v16/Browse.VC.db
+winbuild/.vs/srs_librtmp/v16/Solution.VC.db
